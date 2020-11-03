@@ -1,0 +1,723 @@
+<html>
+  <head>
+    <title>To The Future</title>
+    <link href="https://fonts.googleapis.com/css?family=M+PLUS+1p" rel="stylesheet">
+    <link rel="stylesheet" href="./index.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0, viewport-fit=cover" />
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://unpkg.com/textalive-app-api/dist/index.js"></script>
+    <script src="./js/three.js"></script>
+    <script>
+      window.addEventListener('load', init);
+      function init()
+      {
+        function lerp(x, y, r) {
+          return x + (y - x) * r;
+        }
+
+        // 定数
+        const preViewMsec = 700;
+        const postViewMsec = 1500;
+        const deg2rad = (Math.PI / 180);
+
+        // キャッシュ用変数
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        let halfWidth = width / 2;
+        let halfHeight = height / 2;
+        let minEdge = Math.min(width, height);
+
+        let lyricsBaseFontSize = minEdge * 0.125;
+        let lyricsBaseRadius = minEdge * 0.25;
+
+        const body = document.querySelector("body");
+        const content = document.querySelector("#content");
+
+        const circle = document.querySelector("#circle");
+        circle.width = width;
+        circle.height = height;
+        const circleContext = circle.getContext("2d");
+
+        const threeDCanvas = document.querySelector("#threed");
+        threeDCanvas.width = width;
+        threeDCanvas.height = height;
+
+        const lyrics = document.querySelector("#lyrics");
+        lyrics.width = width;
+        lyrics.height = height;
+        const lyricsContext = lyrics.getContext("2d");
+
+        const playerControl = document.querySelector("#playerControl");
+
+        const progressBase = document.querySelector("#progressBase");
+        const progressSeek = document.querySelector("#progressSeek");
+        const progressBar = document.querySelector("#progressBar");
+
+        const { Player, Ease } = TextAliveApp;
+        const player = new Player({
+            app: {
+            appAuthor: "tacrice",
+            appName: "ToTheFuture"
+          },
+          mediaElement: document.querySelector("#media"),
+          vocalAmplitudeEnabled: true
+        });
+
+        // 3D演出
+        const webGLRenderer = new THREE.WebGLRenderer({
+          canvas: threeDCanvas,
+          antialias: true,
+          alpha: true
+        });
+        webGLRenderer.setPixelRatio(window.devicePixelRatio);
+        webGLRenderer.setSize(width, height);
+        const scene3d = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, width / height, 1, 1200);
+
+        // マジカルミライ風キューブ
+        const MagicalBox = class {
+          static Create(scene, vol) {
+            let geometry = new THREE.BoxGeometry(50, 50, 50);
+            for(let i = 0; i < geometry.faces.length; i++) {
+              geometry.faces[i].materialIndex = Math.floor(Math.random() * 6);
+            }
+
+            const materials = [
+              new THREE.MeshBasicMaterial({color: 0x56f0f0, side: THREE.DoubleSide, depthTest: false, transparent: true, opacity: 0.3}), // ミクカラー
+              new THREE.MeshBasicMaterial({color: 0xf0ab56, side: THREE.DoubleSide, depthTest: false, transparent: true, opacity: 0.3}), // リンカラー
+              new THREE.MeshBasicMaterial({color: 0xf0eb56, side: THREE.DoubleSide, depthTest: false, transparent: true, opacity: 0.3}), // レンカラー
+              new THREE.MeshBasicMaterial({color: 0xf056b5, side: THREE.DoubleSide, depthTest: false, transparent: true, opacity: 0.3}), // ルカカラー
+              new THREE.MeshBasicMaterial({color: 0xf05656, side: THREE.DoubleSide, depthTest: false, transparent: true, opacity: 0.3}), // メイコカラー
+              new THREE.MeshBasicMaterial({color: 0x567cf0, side: THREE.DoubleSide, depthTest: false, transparent: true, opacity: 0.3}), // カイトカラー
+            ];
+
+            let box = new THREE.Mesh(geometry, materials);
+            let deg = Math.random() * 360;
+            let radius = 0.08 * minEdge;
+
+            box.position.x = Math.cos(deg * deg2rad) * radius;
+            box.position.y = Math.sin(deg * deg2rad) * radius;
+            box.position.z = -1000;
+            box.rotation.x = ((Math.random() * 5) + 5) / 10;
+
+            scene.add(box);
+
+            return new MagicalBox(box, vol, scene);
+          }
+
+          constructor(mesh, vol, scene) {
+            this.valid = true;
+            this.mesh = mesh;
+            this.moveZ = 10;
+            this.rotationY = ((Math.random() * 3) + 11) / 100 * (Math.random() < 0.5 ? 1 : -1);
+            this.scale = 0;
+            this.maxScale = (vol * 0.7) + 0.3;
+            this.scene = scene;
+          }
+
+          get isValid() {
+            return this.valid;
+          }
+
+          update() {
+            if (! this.valid) {
+              return;
+            }
+            this.mesh.rotation.y += this.rotationY;
+            this.mesh.position.z += this.moveZ;
+            this.mesh.scale.x = this.mesh.scale.y = this.mesh.scale.z = this.scale = lerp(this.scale, this.maxScale, 0.2);
+            if (this.mesh.position.z > 0) {
+              this.valid = false;
+            }
+          }
+
+          dispose() {
+            this.scene.remove(this.mesh);
+          }
+        }
+
+        // フィナーレサビ用の星屑演出
+        const Stardust = class {
+          constructor(scene, num, color, size) {
+            this.scene = scene;
+
+            let diagonal = Math.sqrt(window.innerWidth * window.innerWidth + window.innerHeight * window.innerHeight);
+            let geometry = new THREE.Geometry();
+            for (let i = 0; i < (num / 2); i++) {
+              let rad = (Math.random() * 360) * deg2rad;
+              geometry.vertices.push(new THREE.Vector3(
+                Math.cos(rad) * (diagonal * 0.4 * (Math.random() * 0.9 + 0.1)),
+                Math.sin(rad) * (diagonal * 0.4 * (Math.random() * 0.9 + 0.1)),
+                (Math.random() * -1500)
+              ));
+            }
+            let material = new THREE.PointsMaterial({
+              color: color,
+              size: size
+            });
+
+            // 切れ目なく繰り返せるように2つのメッシュを用意する
+            this.mesh1 = new THREE.Points(geometry, material);
+            this.mesh2 = new THREE.Points(geometry, material);
+
+            this.isShow = false;
+          }
+
+          show() {
+            if (this.isShow) {
+              return;
+            }
+            this.mesh1.position.z = 0;
+            this.mesh2.position.z = -1500;
+            this.scene.add(this.mesh1);
+            this.scene.add(this.mesh2);
+            this.isShow = true;
+          }
+          hide() {
+            if (! this.isShow) {
+              return;
+            }
+            this.scene.remove(this.mesh1);
+            this.scene.remove(this.mesh2);
+
+            this.isShow = false;
+          }
+          update() {
+            if (! this.isShow) {
+              return;
+            }
+            this.mesh1.position.z += 1;
+            if (this.mesh1.position.z > 1500) {
+              this.mesh1.position.z = -1500;
+            }
+            this.mesh2.position.z += 1;
+            if (this.mesh2.position.z > 1500) {
+              this.mesh2.position.z = -1500;
+            }
+          }
+        }
+
+        let pixels = window.screen.width * window.screen.height * window.devicePixelRatio;
+        let boxMeshes = [];
+        let stardusts = [
+          new Stardust(scene3d, pixels * 0.001, 0xffffff, 1),
+          new Stardust(scene3d, pixels * 0.00005, 0x56f0f0, 2),
+          new Stardust(scene3d, pixels * 0.00005, 0xf0ab56, 2),
+          new Stardust(scene3d, pixels * 0.00005, 0xf0eb56, 2),
+          new Stardust(scene3d, pixels * 0.00005, 0xf056b5, 2),
+          new Stardust(scene3d, pixels * 0.00005, 0xf05656, 2),
+          new Stardust(scene3d, pixels * 0.00005, 0x567cf0, 2),
+        ];
+
+        // 3Dレンダリングループ
+        webGLTick();
+        function webGLTick() {
+　　　　  if (player && player.isPlaying) {
+            let disposable = false;
+            for(let i = 0; i < boxMeshes.length; i++) {
+              boxMeshes[i].update();
+              if (! boxMeshes[i].isValid) {
+                boxMeshes[i].dispose();
+                disposable = true;
+              }
+            }
+            // 無効になったものは取り除く
+            if (disposable) {
+              boxMeshes = boxMeshes.filter(function (boxMesh) {
+                return boxMesh.isValid;
+              });
+            }
+
+            for(let i = 0; i < stardusts.length; i++) {
+              stardusts[i].update();
+            }
+            // レンダリング
+            webGLRenderer.render(scene3d, camera);
+          }
+
+          requestAnimationFrame(webGLTick);
+        }
+
+        /* 再生コントロール */
+        progressSeek.addEventListener("mousedown", onMouseDown);
+        progressSeek.addEventListener("mousemove", onMouseMove);
+        progressSeek.addEventListener("mouseup", onMouseUp);
+        progressSeek.addEventListener("mouseleave", onMouseLeave);
+        let isProgressSeeking = false;
+        function onMouseDown(event) {
+          if (! player || player.isLoading) {
+            return;
+          }
+          isProgressSeeking = true;
+          setProgress(event.offsetX / progressSeek.clientWidth);
+        }
+        function onMouseMove(event) {
+          if (! isProgressSeeking) {
+            return;
+          }
+          setProgress(event.offsetX / progressSeek.clientWidth);
+        }
+        function onMouseUp(event) {
+          if (isProgressSeeking) {
+            setProgress(event.offsetX / progressSeek.clientWidth);
+            if (player.video) {
+              player.requestMediaSeek(player.video.duration * (event.offsetX / progressSeek.clientWidth));
+              if (! player.isPlaying) {
+                player.requestPlay();
+              }
+            }
+            isProgressSeeking = false;
+          }
+        }
+        function onMouseLeave(event) {
+          if (isProgressSeeking) {
+            isProgressSeeking = false;
+          }
+        }
+        function setProgress(val) {
+          progressBar.style.width = `${(val * 100)}%`;
+        }
+
+        playerControl.addEventListener("mousedown", function () {
+          if (player && player.video) {
+            if (player.isPlaying) {
+              player.requestPause();
+            } else {
+              player.requestPlay();
+            }
+          }
+        });
+
+        function setProgressChorus() {
+          if (player.video) {
+            let choruses = player.getChoruses();
+            for(let i = (choruses.length - 1); i >= 0; i--) {
+              let chorusNode = document.createElement("div");
+              chorusNode.className = "progressChorus";
+              chorusNode.style.left = `${(choruses[i].startTime / player.video.duration * 100)}%`;
+              chorusNode.style.width = `${(choruses[i].duration / player.video.duration * 100)}%`;
+              progressBase.insertBefore(chorusNode, progressBase.firstChild);
+            }
+          }
+        }
+
+        // ビートサークル
+        let sizeRate = 0;
+        let isFillCircle = false;
+        function strokeCircle() {
+          let size = minEdge * sizeRate;
+          circleContext.clearRect(0, 0, width, height);
+          circleContext.beginPath();
+          circleContext.arc(halfWidth, halfHeight, size / 2, 0, 360 * deg2rad, false);
+          circleContext.strokeStyle = "rgba(0, 181, 178, " + Math.max((1 - sizeRate), 0.1) + ")";
+          if (isFillCircle) {
+            circleContext.fillStyle = "rgba(60, 60, 60, 1)";
+            circleContext.fill();
+          }
+          circleContext.lineWidth = 1;
+          circleContext.stroke();
+        }
+
+        let title = "";
+        let titleStyle = "rgba(30, 30, 30, 1)";
+        let artist = "";
+        let titlePositions = [];
+        let artistPositions = [];
+        let finaleChorusIndexes = [];
+
+        // タイトル・アーティスト・歌詞表示
+        function drawLyrics(position) {
+          let chorus = player.findChorus(position);
+
+          lyricsContext.clearRect(0, 0, width, height);
+          lyricsContext.beginPath();
+          lyricsContext.textAlign = "center";
+          lyricsContext.textBaseline = "middle";
+
+          // タイトル
+          for(let i = 0; i < titlePositions.length; i++) {
+            if (titlePositions[i].startTime <= position && position < titlePositions[i].endTime) {
+              lyricsContext.font = `bold ${width * 0.05}px 'M PLUS 1p'`;
+              lyricsContext.fillStyle = titleStyle;
+              lyricsContext.fillText(title, halfWidth, halfHeight, width * 0.9);
+              break;
+            }
+          }
+
+          // アーティスト
+          for(let i = 0; i < artistPositions.length; i++) {
+            if (artistPositions[i].startTime <= position && position < artistPositions[i].endTime) {
+              lyricsContext.fillStyle = "rgba(30, 30, 30, 1)";
+              lyricsContext.font = `bold ${width * 0.03}px 'M PLUS 1p'`;
+              lyricsContext.fillText(artist, halfWidth, halfHeight, width * 0.9);
+　　　　　　　break;
+            }
+          }
+
+          // 歌詞
+          let phrase = player.video.firstPhrase;
+          while (phrase) {
+            if (position < (phrase.startTime - preViewMsec)) {
+              phrase = phrase.next;
+              continue;
+            }
+            if ((phrase.endTime + postViewMsec) <= position) {
+              phrase = phrase.next;
+              continue;
+            }
+
+            let radian = phrase.degree * deg2rad;
+            let word = phrase.lastWord;
+            while (word && word.parent == phrase) {
+              if(position < (word.startTime - preViewMsec) || (word.endTime + postViewMsec) <= position) {
+                word = word.previous;
+                continue;
+              }
+
+              let char = word.lastChar;
+              while (char && char.parent == word) {
+                if((char.adjustTime - preViewMsec) <= position && position < (char.endTime + postViewMsec)) {
+                  let fontSize = Math.pow(((position - char.adjustTime + preViewMsec) / preViewMsec), 1.5) * lyricsBaseFontSize;
+                  let radius = Math.pow(((position - char.adjustTime + preViewMsec) / preViewMsec), 2) * lyricsBaseRadius;
+
+                  let x = halfWidth + (Math.cos(radian) * radius);
+                  let y = halfHeight + (Math.sin(radian) * radius);
+
+                  // "ー"は直感的ではなくなるので文字自体を回転させる
+                  if (char.text == "ー") {
+                    lyricsContext.save();
+                    lyricsContext.translate(x, y);
+                    lyricsContext.rotate(radian + Math.PI);
+                    x = 0;
+                    y = 0;
+                  }
+
+                  // 文字背後色の描画
+                  if (chorus) {
+                    lyricsContext.fillStyle = "rgba(60, 60, 60, 1)";
+                  } else {
+                    lyricsContext.fillStyle = "rgba(245, 245, 245, 1)";
+                  }
+                  lyricsContext.font = `bold ${fontSize + 2}px '${char.font.family}', 'M PLUS 1p'`;
+                  lyricsContext.fillText(char.text, x, y);
+
+                  // 文字描画
+                  if (chorus) {
+                    lyricsContext.fillStyle = "rgba(230, 230, 230, 1)";
+                  } else {
+                    lyricsContext.fillStyle = "rgba(30, 30, 30, 1)";
+                  }
+                  lyricsContext.font = `bold ${fontSize}px '${char.font.family}', 'M PLUS 1p'`;
+                  lyricsContext.fillText(char.text, x, y);
+
+                  if (char.text == "ー") {
+                    lyricsContext.restore();
+                  }
+                }
+
+                char = char.previous;
+              }
+              word = word.previous;
+            }
+            phrase = phrase.next;
+          }
+        }
+
+        // 画面リサイズ時
+        window.addEventListener("resize", function () {
+          // キャッシュ用変数の更新
+          width = window.innerWidth;
+          height = window.innerHeight;
+          halfWidth = width / 2;
+          halfHeight = height / 2;
+          minEdge = Math.min(width, height);
+          lyricsBaseFontSize = minEdge * 0.125;
+          lyricsBaseRadius = minEdge * 0.25;
+
+          circle.width = width;
+          circle.height = height;
+
+          threeDCanvas.width = width;
+          threeDCanvas.height = height;
+
+          lyrics.width = width;
+          lyrics.height = height;
+
+          webGLRenderer.setPixelRatio(window.devicePixelRatio);
+          webGLRenderer.setSize(width, height);
+
+          camera.aspect = (width / height);
+          camera.updateProjectionMatrix();
+
+          webGLRenderer.render(scene3d, camera);
+
+          if (player && player.video) {
+            strokeCircle();
+            drawLyrics(player.timer.position);
+          }
+        });
+
+        // プレイヤーイベント
+        player.addListener({
+          onAppReady:(app) => {
+            if (!app.managed) {
+
+              let song = 3;
+              let param = location.search;
+              if (param) {
+                param = param.substring((param.indexOf("?") + 1));
+                params = param.split("&");
+                for (let i = 0; i < params.length; i++) {
+                  let kv = params[i].split("=");
+                  switch (kv[0]) {
+                    case "s":
+                      if (kv.length > 1) {
+                        song = kv[1];
+                      }
+                      break;
+                  }
+                }
+              }
+
+              switch (song) {
+                case "1":
+                  // グリーンライツ・セレナーデ / Omoi feat. 初音ミク
+                  // - 初音ミク「マジカルミライ 2018」テーマソング
+                  // - 楽曲: http://www.youtube.com/watch?v=XSLhsjepelI
+                  // - 歌詞: https://piapro.jp/t/61Y2
+                  player.createFromSongUrl("http://www.youtube.com/watch?v=XSLhsjepelI", {
+                    video: {
+                      // 音楽地図訂正履歴: https://songle.jp/songs/1249410/history
+                      beatId: 3818919,
+                      chordId: 1207328,
+                      repetitiveSegmentId: 1942131,
+                      // 歌詞タイミング訂正履歴: https://textalive.jp/lyrics/www.youtube.com%2Fwatch%3Fv%3DXSLhsjepelI
+                      lyricId: 50145,
+                      lyricDiffId: 3168
+                    }
+                  });
+                  break;
+
+                case "2":
+                  // ブレス・ユア・ブレス / 和田たけあき feat. 初音ミク
+                  // - 初音ミク「マジカルミライ 2019」テーマソング
+                  // - 楽曲: http://www.youtube.com/watch?v=a-Nf3QUFkOU
+                  // - 歌詞: https://piapro.jp/t/Ytwu
+                  player.createFromSongUrl("http://www.youtube.com/watch?v=a-Nf3QUFkOU", {
+                    video: {
+                      // 音楽地図訂正履歴: https://songle.jp/songs/1688650/history
+                      beatId: 3818481,
+                      chordId: 1546157,
+                      repetitiveSegmentId: 1942135,
+                      // 歌詞タイミング訂正履歴: https://textalive.jp/lyrics/www.youtube.com%2Fwatch%3Fv=a-Nf3QUFkOU
+                      lyricId: 50146,
+                      lyricDiffId: 3143
+                    }
+                  });
+                  break;
+
+                default:
+                  // 愛されなくても君がいる / ピノキオピー feat. 初音ミク
+                  // - 初音ミク「マジカルミライ 2020」テーマソング
+                  // - 楽曲: http://www.youtube.com/watch?v=ygY2qObZv24
+                  // - 歌詞: https://piapro.jp/t/PLR7
+                  player.createFromSongUrl("http://www.youtube.com/watch?v=ygY2qObZv24", {
+                    video: {
+                      // 音楽地図訂正履歴: https://songle.jp/songs/1977449/history
+                      beatId: 3818852,
+                      chordId: 1955797,
+                      repetitiveSegmentId: 1942043,
+                      // 歌詞タイミング訂正履歴: https://textalive.jp/lyrics/www.youtube.com%2Fwatch%3Fv=ygY2qObZv24
+                      lyricId: 50150,
+                      lyricDiffId: 3158
+                    }
+                  });
+                  break;
+              }
+
+              let node = document.createElement("p");
+              node.textContent = "now loading..";
+              playerControl.appendChild(node);
+            }
+          },
+          onTimerReady:onTimerReady,
+          onTimeUpdate:onTimeUpdate,
+          onPlay: () => {
+            while(playerControl.firstChild) {
+              playerControl.removeChild(playerControl.firstChild);
+            }
+          }
+        });
+
+        function onTimerReady() {
+          setProgressChorus();
+
+          // 連続して歌詞が重ならないように連続して前後60度以内にはならないようにする
+          let offset = Math.floor(Math.random() * 360);
+
+          let phrase = player.video.firstPhrase;
+          while(phrase) {
+            let degree = (Math.floor(Math.random() * 300) + offset) % 360;
+            offset = degree - 30;
+
+            // フレーズのプロパティに角度を追加
+            phrase.degree = degree;
+
+            // 文字の開始時間を使用すると重なりすぎてしまうため単語間で均一に調整する
+            let word = phrase.firstWord;
+            while(word && word.parent == phrase) {
+              let charSpacing = (word.children.length > 1) ? (word.duration / (word.children.length + 1)) : 0;
+              let char = word.firstChar;
+              let i = 0;
+              while(char && char.parent == word) {
+                char.adjustTime = word.startTime + (charSpacing * (i + 1));
+                i++;
+                char = char.next;
+              }
+              word = word.next;
+            }
+            phrase = phrase.next;
+          }
+
+          // 曲固有の設定
+          switch (player.data.song.id) {
+            case 1249410:
+              // グリーンライツ・セレナーデ
+              title = player.data.song.name;
+              titleStyle = "rgba(89, 255, 56, 1)";
+              artist = player.data.song.artist.name;
+              titlePositions = [
+                {startTime:23500, endTime:28400}
+              ];
+              artistPositions = [
+                {startTime:28500, endTime:31000}
+              ];
+              finaleChorusIndexes = [7, 8, 9, 10];
+              break;
+            case 1688650:
+              // ブレス・ユア・ブレス
+              title = player.data.song.name;
+              titleStyle = "rgba(242, 61, 218, 1)";
+              artist = player.data.song.artist.name;
+              titlePositions = [
+                {startTime:9300, endTime:12000},
+                {startTime:239000, endTime:250000}
+              ];
+              artistPositions = [
+                {startTime:12300, endTime:15000}
+              ];
+              finaleChorusIndexes = [5, 6];
+              break;
+            case 1977449:
+              // 愛されなくても君がいる
+              title = player.data.lyricsBody.name;
+              titleStyle = "rgba(242, 61, 218, 1)";
+              artist = player.data.lyricsBody.artist.name;
+              titlePositions = [
+                {startTime:12900, endTime:19300}
+              ];
+              artistPositions = [
+                {startTime:21900, endTime:25300}
+              ];
+              finaleChorusIndexes = [2];
+              break;
+            default:
+              title = "";
+              titleStyle = "rgba(30, 30, 30, 1)";
+              artist = "";
+              titlePositions = [];
+              artistPositions = [];
+              finaleChorusIndexes = [];
+              break;
+          }
+
+          while(playerControl.firstChild) {
+            playerControl.removeChild(playerControl.firstChild);
+          }
+          let node = document.createElement("p");
+          node.textContent = "tap to start";
+          playerControl.appendChild(node);
+        }
+
+        let totalAmplitude = 0;
+        let duringChangeBeatPosition = 0; 
+        function onTimeUpdate(position) {
+          if (! isProgressSeeking) {
+            setProgress(position / player.video.duration);
+          }
+
+          let chorus = player.findChorus(position);
+
+          if (chorus && finaleChorusIndexes.indexOf(chorus.index) != -1 && isFillCircle) {
+            // フィナーレサビ演出
+            for(let i = 0; i < stardusts.length; i++) {
+              stardusts[i].show();
+            }
+          } else {
+            for(let i = 0; i < stardusts.length; i++) {
+              stardusts[i].hide();
+            }
+          }
+
+          // ビートサークル描画
+          let beat = player.findBeat(position);
+          if (beat) {
+            sizeRate = Ease.circIn(beat.progress(position)) * 2;
+            if (chorus && chorus.endTime >= position) {
+              if (! isFillCircle) {
+                isFillCircle = true;
+                duringChangeBeatPosition = beat.endTime;
+              }
+              if (duringChangeBeatPosition != 0 && duringChangeBeatPosition < position) {
+                // サビに入るときはサークルの中から場面転換を行う
+                body.style.backgroundColor = "rgba(60, 60, 60, 1)";
+                body.style.animation = "";
+                content.style.backgroundColor = "rgba(60, 60, 60, 1)";
+                content.style.animation = "";
+                duringChangeBeatPosition = 0;
+              }
+            } else {
+              if (isFillCircle) {
+                // サビから戻るときはcssアニメーションで戻す
+                isFillCircle = false;
+                body.style.animation = "backColor 1s forwards";
+                content.style.animation = "backColor 1s forwards";
+              }
+            }
+          } else {
+            sizeRate = 0;
+          }
+          strokeCircle();
+
+          // 歌詞
+          drawLyrics(position);
+
+          // 3Dオブジェクトの生成(音声情報を元に生成する)
+          let vocalAmplitude = player.getVocalAmplitude(position);
+          let vocalAmplitudeRate = vocalAmplitude / player.getMaxVocalAmplitude();
+          totalAmplitude += vocalAmplitude;
+          if (totalAmplitude >= 200000) {
+            let t = Math.floor(totalAmplitude / 200000);
+            for(let i = 0; i < t; i++) {
+              boxMeshes.push(MagicalBox.Create(scene3d, vocalAmplitudeRate));
+            }
+            totalAmplitude %= 200000;
+          }
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="content">
+      <canvas id="circle"></canvas>
+      <canvas id="threed"></canvas>
+      <canvas id="lyrics"></canvas>
+      <div id="playerControl"></div>
+      <div id="media"></div>
+    </div>
+    <div id="progressBase">
+      <div id="progressBar"></div>
+      <div id="progressSeek"></div>
+    </div>
+  </body>
+</html>
