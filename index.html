@@ -212,7 +212,7 @@
         // 3Dレンダリングループ
         webGLTick();
         function webGLTick() {
-　　　　  if (player && player.isPlaying) {
+          if (player && player.isPlaying) {
             let disposable = false;
             for(let i = 0; i < boxMeshes.length; i++) {
               boxMeshes[i].update();
@@ -350,7 +350,7 @@
               lyricsContext.fillStyle = "rgba(30, 30, 30, 1)";
               lyricsContext.font = `bold ${width * 0.03}px 'M PLUS 1p'`;
               lyricsContext.fillText(artist, halfWidth, halfHeight, width * 0.9);
-　　　　　　　break;
+              break;
             }
           }
 
