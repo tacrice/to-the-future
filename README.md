@@ -1,4 +1,8 @@
 # TextAlive App APIを利用したWebアプリケーション
+
+<img src="https://github.com/tacrice/to-the-future/blob/main/screenshots/screenshot1.png" width="600">
+
+
 本アプリケーションは初音ミク「マジカルミライ 2020」プログラミング・コンテスト応募作品です  
 https://magicalmirai.com/2020/procon/
 
@@ -28,6 +32,8 @@ https://threejs.org/
 ### 長音符
 長音符("ー")は角度がついていると見た目がよくなかったので、文字ごと回転させる処理を入れました
 
+<img src="https://github.com/tacrice/to-the-future/blob/main/screenshots/screenshot4.png" width="400">
+
 ## キューブについて
 マジカルミライといえばキューブのイメージだったので作成しました
 ### メッシュ
@@ -45,10 +51,15 @@ TextAlive App APIの歌声の声量(vocalAmplitude)を積み重ねて一定数�
 驚きを与えるために、サビに入る遷移はビートを使用したサークルの円の内側からパキッと変化するようにしました  
 逆にサビから戻るところはシームレスに演出してます
 
+<img src="https://github.com/tacrice/to-the-future/blob/main/screenshots/screenshot2.png" width="400">
+<img src="https://github.com/tacrice/to-the-future/blob/main/screenshots/screenshot3.png" width="400">
+
 ### ラストサビ演出
 こちらはさらなる驚きと盛り上がりを与えるために、星屑の演出も追加しました
 星屑は大きなポイントマテリアルのジオメトリを1セット2つずつ用意し、ベルトコンベアのように動作することで無限に流れていくようにしてます
 またこちらにもピアプロキャラクターをイメージしたカラーを少量配置しています
+
+<img src="https://github.com/tacrice/to-the-future/blob/main/screenshots/screenshot5.png" width="600">
 
 ## スマートフォンでの視聴
 PCだけではなくスマートフォン(iPhone)での視聴も確認してます
